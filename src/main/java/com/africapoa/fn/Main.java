@@ -1,6 +1,6 @@
 package com.africapoa.fn;
 
-import com.africapoa.fn.ds.JsonQ_Old;
+import com.africapoa.fn.ds.JsonQ;
 
 import java.io.File;
 import java.util.List;
@@ -9,8 +9,9 @@ import java.util.List;
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
     public static void main(String[] args) {
-        JsonQ_Old jsonQ= JsonQ_Old.fromIO(new File("/home/n2/Downloads/sample.json"));
-        List<String> val=jsonQ.get("..code").getStrings("[-1,0]");
+        JsonQ jsonQ= JsonQ.fromIO(new File("/home/n2/Downloads/sample.json"));
+        List<String> val=jsonQ.get("..features[*].properties[*]")//.getStrings();
+                .select("reg_name","dist_name","ward_name").getStrings();
         System.out.println(val);
 
 

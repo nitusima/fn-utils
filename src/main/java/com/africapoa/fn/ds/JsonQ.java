@@ -16,41 +16,93 @@ import java.util.regex.Pattern;
 import static com.africapoa.fn.utils.Log.log;
 
 
-//ONLY USE for thoroughly tested cases, though this is convenient, it is still unstable and may break
 
-///** @noinspection unused*/
+/**
+ * A utility class for querying and manipulating JSON-like data structures.
+ * Provides methods to parse, filter, and extract data from JSON strings, files,
+ * input streams, or POJOs (Plain Old Java Objects). Supports JSON path expressions
+ * for querying nested structures.
+ * <p>
+ * Warning: Use only for thoroughly tested cases as this implementation, while convenient,
+ * may be unstable and subject to breaking changes.
+ */
+//ONLY USE for thoroughly tested cases, though this is convenient, it is still unstable and may break
+@SuppressWarnings("unused")
 public class JsonQ {
     private static final Gson gson = JsonUtil.getGson();
     private final Object root;
     private final PathEvaluator pathEvaluator=PathEvaluator.getInstance();
     private final BoolEvaluator BOOL = new BoolEvaluator();
-    private static final Pattern INTEGER=PathType.INTEGER.getPattern();
     private static final Pattern VALUED_TRUE=PathType.VALUED_TRUE.getPattern();
     private static final Pattern VALUED_FALSE=PathType.VALUED_FALSE.getPattern();
 
+    /**
+     * Constructs a JsonQ instance with the given input as the root object.
+     *
+     * @param input The root object to query (can be a Map, List, or primitive)
+     */
     private JsonQ(Object input) {
         root = input;
     }
 
+    /**
+     * Creates a JsonQ instance from a JSON string.
+     *
+     * @param json The JSON string to parse
+     * @return A new JsonQ instance with the parsed JSON structure
+     */
     public static JsonQ fromJson(String json) {
         return new JsonQ(val(json));
     }
 
+    /**
+     * Deserializes a JSON string into an object of the specified class.
+     *
+     * @param <T>   The type of the target object
+     * @param json  The JSON string to deserialize
+     * @param clazz The class of the target object
+     * @return An instance of the specified class populated with the JSON data
+     */
     public static <T> T fromJson(String json,Class<T> clazz) {
         return gson.fromJson(json,clazz);
     }
+
+    /**
+     * Creates a JsonQ instance from an InputStream containing JSON data.
+     *
+     * @param jsonStream The InputStream with JSON data
+     * @return A new JsonQ instance with the parsed JSON structure
+     */
     public static JsonQ fromIO(InputStream jsonStream) {
         return new JsonQ(val(stringFromIO(jsonStream)));
     }
 
+    /**
+     * Creates a JsonQ instance from a File containing JSON data.
+     *
+     * @param jsonFile The File with JSON data
+     * @return A new JsonQ instance with the parsed JSON structure
+     */
     public static JsonQ fromIO(File jsonFile) {
         return new JsonQ(val(stringFromIO(jsonFile)));
     }
 
+    /**
+     * Creates a JsonQ instance from a Plain Old Java Object (POJO).
+     *
+     * @param object The POJO to wrap
+     * @return A new JsonQ instance with the POJO as the root
+     */
     public static JsonQ fromPOJO(Object object) {
         return new JsonQ(isPrimitive(object) ? object : getObjectRoot(object));
     }
 
+    /**
+     * Reads a string from an InputStream or File.
+     *
+     * @param input The InputStream or File to read from
+     * @return The string content, or an empty string if reading fails
+     */
     private static String stringFromIO(Object input) {
         try {
             BufferedReader reader;
@@ -69,6 +121,12 @@ public class JsonQ {
         return "";
     }
 
+    /**
+     * Parses a JSON string into a Java object (Map, List, or primitive).
+     *
+     * @param jsonRoot The JSON string to parse
+     * @return The parsed object (Map for objects, List for arrays, or primitive value)
+     */
     private static Object val(String jsonRoot) {
         JsonElement element = JsonParser.parseString(jsonRoot);
         Type objectType = new TypeToken<Map<String, Object>>() {
@@ -82,6 +140,13 @@ public class JsonQ {
                 : null;
     }
 
+    /**
+     * Converts a JsonPrimitive to a Java primitive type.
+     *
+     * @param <T>      The expected primitive type
+     * @param primitive The JsonPrimitive to convert
+     * @return The converted value (Boolean, Number, String, or null)
+     */
     @SuppressWarnings("unchecked")
     private static <T> T valPrimitive(JsonPrimitive primitive) {
         return primitive.isBoolean() ? (T) Boolean.valueOf(primitive.getAsBoolean())
@@ -90,12 +155,28 @@ public class JsonQ {
                 : null;
     }
 
+    /**
+     * Retrieves a list of transformed values from a JSON path.
+     *
+     * @param <T>     The type of the transformed values
+     * @param jsonPath The JSON path to query
+     * @param changer A function to transform each found object
+     * @return A list of transformed values
+     */
     private <T> List<T> getListImpl(String jsonPath, JFunction<Object, T> changer) {
         List<T> list = new ArrayList<>();
         flatForEach(find(jsonPath), (key, obj) -> list.add(changer.apply(obj)));
         return list;
     }
 
+    /**
+     * Retrieves a list of transformed Map values from a JSON path.
+     *
+     * @param <T>     The type of the transformed values
+     * @param jsonPath The JSON path to query
+     * @param changer A function to transform each Map object
+     * @return A list of transformed values
+     */
     public <T> List<T> getList(String jsonPath, JFunction<Map<?, ?>, T> changer) {
         List<T> list = new ArrayList<>();
         flatForEach(find(jsonPath), (key, obj) -> {
@@ -105,6 +186,12 @@ public class JsonQ {
         return list;
     }
 
+    /**
+     * Selects specific columns from a collection of objects.
+     *
+     * @param columns The names of the columns to select
+     * @return A new JsonQ instance with the selected data
+     */
     public JsonQ select(String ...columns) {
         List<Object> results=new ArrayList<>();
         collectionForEach(root,(k,v)->{
@@ -114,21 +201,39 @@ public class JsonQ {
                 Map<String,Object> selection=new HashMap<>();
                 for(String key:columns){
                        data.get(key);
-                       selection.put(key,data.get("key"));
+                       selection.put(key,data.get(key));
                 }
                 results.add(selection);
             }
         });
         return fromResults(results);
     }
+    /**
+     * Extracts a column of integers from the JSON data.
+     *
+     * @param columnName The name of the column to extract
+     * @return A list of integers from the specified column
+     */
     public List<Integer> intColumn(String columnName) {
         String path= String.format("[(@.%s~'\\d+')]",columnName);
         return fromResults(getListImpl(path, a -> a instanceof Integer ? a : null)).val();
     }
+    /**
+     * Extracts a column of dates from the JSON data.
+     *
+     * @param columnName The name of the column to extract
+     * @return A list of Date objects from the specified column
+     */
     public List<Date> dateColumn(String columnName) {
         String path= String.format("[(@.%s~'\\d{2,4}-\\d{2}-\\d{2,4}')].%s",columnName,columnName);
         return getDates(path);
     }
+    /**
+     * Retrieves a list of Date objects from a JSON path.
+     *
+     * @param path The JSON path to query
+     * @return A list of parsed Date objects
+     */
     public List<Date> getDates(String path) {
         List<Date> dates = new ArrayList<>();
         for(String d:getStrings(path)){
@@ -138,6 +243,12 @@ public class JsonQ {
         return dates;
     }
 
+    /**
+     * Parses a string into a Date object using supported formats.
+     *
+     * @param date The date string to parse
+     * @return The parsed Date object, or null if parsing fails
+     */
     private Date getDate(String date){
         try {
             if(date.matches("\\d{4}-\\d{2}-\\d{2}"))
@@ -148,20 +259,59 @@ public class JsonQ {
         catch (ParseException e) {log(e);}
         return null;
     }
+
+    /**
+     * Extracts a column of strings from the JSON data.
+     *
+     * @param columnName The name of the column to extract
+     * @return A list of strings from the specified column
+     */
     public List<String> stringColumn(String columnName) {
         return getStrings("[*]."+columnName);
     }
+
+    /**
+     * Retrieves all strings from the root object.
+     *
+     * @return A list of all string values
+     */
     public List<String> getStrings() {return getStrings("[*]");}
+
+    /**
+     * Retrieves a list of strings from a formatted JSON path.
+     *
+     * @param jsonPath The JSON path template
+     * @return A list of string values
+     */
     public List<String> getStrings(String jsonPath) {
         return getListImpl(jsonPath, a -> (a instanceof String) ? (String) a : gson.toJson(a));
     }
 
+    /**
+     * Retrieves a list of strings from a formatted JSON path.
+     *
+     * @param jsonPath The JSON path template
+     * @param args     Arguments to format the path
+     * @return A list of string values
+     */
     public List<String> getStrings(String jsonPath, Object... args) {
         return getStrings(String.format(jsonPath, args));
     }
 
+    /**
+     * Returns the root object as a JSON string.
+     *
+     * @return The JSON string representation of the root
+     */
     public String str() {return str("");}
 
+    /**
+     * Retrieves a string value from a formatted JSON path.
+     *
+     * @param jsonPath The JSON path template
+     * @param args     Arguments to format the path
+     * @return The string value, or an empty string if not found
+     */
     public String str(String jsonPath, Object... args) {
         return str(String.format(jsonPath, args));
     }
@@ -171,10 +321,24 @@ public class JsonQ {
         return obj instanceof String ? (String) obj : obj == null ? "" : gson.toJson(obj);
     }
 
+    /**
+     * Queries the JSON data with a formatted path.
+     *
+     * @param path The JSON path template
+     * @param args Arguments to format the path
+     * @return A new JsonQ instance with the query results
+     */
     public JsonQ get(String path, Object... args) {
         return get(String.format(path, args));
     }
 
+    /**
+     * Filters the JSON data based on a condition.
+     *
+     * @param condition The condition string (e.g., "@.age > 18")
+     * @param values    Values to replace placeholders in the condition
+     * @return A new JsonQ instance with the filtered results
+     */
     public JsonQ where(String condition, Object ... values){
         condition=condition.replaceAll("\\band\\b","&&")
                 .replaceAll("\\bor\\b","||")
@@ -190,10 +354,23 @@ public class JsonQ {
         List<Object> results=filter(condition,root,new ArrayList<>());
         return fromResults(results);
     }
+    /**
+     * Escapes special characters in a string for use in regular expressions.
+     *
+     * @param input The string to escape
+     * @return The escaped string
+     */
+
     private String escapeRGX(String input){
        return input.replace("\\","\\\\");
     }
 
+    /**
+     * Creates a JsonQ instance from a list of results, cleaning null values.
+     *
+     * @param results The list of results
+     * @return A new JsonQ instance with the cleaned results
+     */
     private JsonQ fromResults(List<Object> results){
         Iterator<Object> it=results.listIterator();
         while(it.hasNext()){
@@ -207,25 +384,58 @@ public class JsonQ {
         return fromResults(find(path));
     }
 
-//    /**
-//     * @noinspection unchecked
-//     */
-    public <T> T val() {return (T) root;}
+    /**
+     * Returns the root object, cast to the desired type.
+     *
+     * @param <T> The expected type
+     * @return The root object
+     */
+    public <T> T val() {
+        //noinspection unchecked
+        return (T) root;}
 
+    /**
+     * Checks if the JSON data is empty.
+     *
+     * @return True if the data is empty, false otherwise
+     */
     public boolean isEmpty() {
         return root == null || (root instanceof Map && ((Map<?, ?>) root).isEmpty()) ||
                 (root instanceof Collection && ((Collection<?>) root).isEmpty()) ||
                 (root instanceof String && ((String) root).isEmpty());
     }
 
+    /**
+     * Checks if the JSON data has content.
+     *
+     * @return True if the data is not empty, false otherwise
+     */
     public boolean hasStuff(){ return !isEmpty(); }
+    /**
+     * Checks if the JSON data is not empty.
+     *
+     * @return True if the data is not empty, false otherwise
+     */
     public boolean notEmpty(){ return !isEmpty(); }
 
+    /**
+     * Returns a string representation of the JSON data.
+     *
+     * @return The JSON string representation
+     */
     @Override
     public String toString() {
         return root instanceof String ? (String) root : gson.toJson(root);
     }
 
+    /**
+     * Retrieves the first value from a JSON path and applies a transformation.
+     *
+     * @param <T>      The type of the transformed value
+     * @param jsonPath The JSON path to query
+     * @param changer  A function to transform the found object
+     * @return The transformed value, or null if not found
+     */
     public <T> T first(String jsonPath, JFunction<Object, T> changer) {
         List<?> res = find(jsonPath);
         if (!res.isEmpty()) {
@@ -234,15 +444,33 @@ public class JsonQ {
         return null;
     }
 
+    /**
+     * Adds or updates a value at a JSON path.
+     *
+     * @param jsonPath The JSON path to modify
+     * @param value    The value to set
+     */
     public void put(String jsonPath, Object value) {
         int x = jsonPath.lastIndexOf(".");
         String prop = jsonPath.substring(x < 0 ? 0 : x + 1);
         put(jsonPath, true, prop, value);
     }
+    /**
+     * Adds a value to the root list (if it is a list).
+     *
+     * @param value The value to add
+     */
     public void add( Object value) {
         put("", false, "", value);
     }
 
+    /**
+     * Adds or updates multiple values at a JSON path.
+     *
+     * @param jsonPath The JSON path to modify
+     * @param override Whether to override existing values
+     * @param values   Pairs of keys and values to set
+     */
     public void put(String jsonPath, boolean override, Object... values) {
         int x = jsonPath.lastIndexOf(".");
         String prop = jsonPath.substring(x < 0 ? 0 : x + 1);
@@ -484,4 +712,6 @@ public class JsonQ {
             new SimpleDateFormat("yyyy-MM-dd",Locale.ENGLISH ),
             new SimpleDateFormat("dd-MM-yyyy" ,Locale.ENGLISH)
     );
+
+
 }
