@@ -7,6 +7,9 @@ import com.africapoa.fn.utils.JsonUtil;
 import javax.annotation.Nullable;
 import java.io.*;
 import java.lang.reflect.Type;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -77,6 +80,20 @@ public class JsonQ {
         return new JsonQ(val(stringFromIO(jsonStream)));
     }
 
+    public static JsonQ fromURL(String urlString) {
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(10000); // 10 seconds
+            connection.setReadTimeout(10000);    // 10 seconds
+            connection.connect();
+            InputStream inputStream = connection.getInputStream();
+            return JsonQ.fromIO(inputStream);
+        } catch (IOException e) {log(e);}
+        return new JsonQ("");
+    }
+
     /**
      * Creates a JsonQ instance from a File containing JSON data.
      *
@@ -84,6 +101,7 @@ public class JsonQ {
      * @return A new JsonQ instance with the parsed JSON structure
      */
     public static JsonQ fromIO(File jsonFile) {
+        if(!jsonFile.exists()) return new JsonQ("");
         return new JsonQ(val(stringFromIO(jsonFile)));
     }
 
@@ -104,22 +122,30 @@ public class JsonQ {
      * @return The string content, or an empty string if reading fails
      */
     private static String stringFromIO(Object input) {
-        try {
-            BufferedReader reader;
-            if (input instanceof File)
-                reader = new BufferedReader(new FileReader((File) input));
-            else if (input instanceof InputStream)
-                reader = new BufferedReader(new InputStreamReader((InputStream) input));
-            else return "";
+        if (!(input instanceof File || input instanceof InputStream)) {
+            return "";
+        }
+        try (BufferedReader reader = input instanceof File
+                ? new BufferedReader(new FileReader((File) input))
+                : new BufferedReader(new InputStreamReader((InputStream) input, StandardCharsets.UTF_8))) {
 
             StringBuilder sb = new StringBuilder();
-            for (String s = reader.readLine(); s != null; s = reader.readLine()) sb.append(s);
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append(System.lineSeparator());
+            }
             return sb.toString();
-        } catch (IOException e) {
-           log(e);
-        }
-        return "";
+        } catch (IOException e) {log(e);return "";}
     }
+
+    public boolean toFile(File file) {
+        try(BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            writer.write(this.toString());
+            return true;}
+        catch (IOException e) { log(e); return false;}
+    }
+
+
 
     /**
      * Parses a JSON string into a Java object (Map, List, or primitive).
@@ -477,6 +503,11 @@ public class JsonQ {
         Object res = find(jsonPath.substring(0, Math.max(x, 0)));
         flatForEach(res, (k, v) -> put(override, v, values));
     }
+
+        public void putNoNull(String jsonPath, Object value) {
+                if(value==null) return;
+                put(jsonPath, value);
+            }
 
     /**
      * @noinspection unchecked

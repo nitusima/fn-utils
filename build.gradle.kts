@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.africapoa.fn"
-version = "0.0.2"
+version = "0.0.3"
 
 repositories {
     mavenCentral()
@@ -78,11 +78,11 @@ publishing {
                         email.set("nitu@africapoa.com")
                     }
                 }
-                scm {
-                    connection.set("scm:git:https://github.com/nitusima/fn-utils.git")
-                    developerConnection.set("scm:git:ssh://github.com/nitusima/fn-utils.git")
-                    url.set("http://github.com/nitusima/fn-utils.git")
-                }
+//                scm {
+//                    connection.set("scm:git:https://github.com/nitusima/fn-utils.git")
+//                    developerConnection.set("scm:git:ssh://github.com/nitusima/fn-utils.git")
+//                    url.set("http://github.com/nitusima/fn-utils.git")
+//                }
             }
         }
     }
