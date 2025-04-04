@@ -241,9 +241,20 @@ public class JsonQ {
      * @return A list of integers from the specified column
      */
     public List<Integer> intColumn(String columnName) {
-        String path= String.format("[(@.%s~'\\d+')]",columnName);
-        return fromResults(getListImpl(path, a -> a instanceof Integer ? a : null)).val();
+        String path= String.format("[(@.%s~'\\d+\\.?\\d*')].%s",columnName,columnName);
+        return fromResults(getListImpl(path, a -> a instanceof Number ? ((Number) a).intValue() : null)).val();
     }
+    /**
+     * Extracts a column of integers from the JSON data.
+     *
+     * @param path The path of the column to extract
+     * @return A list of integers from the specified column
+     */
+    public List<Integer> integers(String path) {
+        return fromResults(getListImpl(path, a -> a instanceof Number ? ((Number) a).intValue() : null)).val();
+    }
+
+
     /**
      * Extracts a column of dates from the JSON data.
      *
@@ -418,7 +429,17 @@ public class JsonQ {
      */
     public <T> T val() {
         //noinspection unchecked
-        return (T) root;}
+        return isEmpty()?null:(T) root;}
+
+
+    public Integer asInt(String jsonPath) {
+        Object x=get(jsonPath).root;
+        return x instanceof Number? ((Number)x).intValue():null;
+    }
+
+    public int asInt() {
+        return asInt(".");
+    }
 
     /**
      * Checks if the JSON data is empty.
@@ -463,9 +484,9 @@ public class JsonQ {
      * @return The transformed value, or null if not found
      */
     public <T> T first(String jsonPath, JFunction<Object, T> changer) {
-        List<?> res = find(jsonPath);
-        if (!res.isEmpty()) {
-            return changer.apply(res.get(0));
+        JsonQ jq = get(jsonPath);
+        if (!jq.isEmpty()) {
+            return changer.apply(jq.root);
         }
         return null;
     }
@@ -564,10 +585,10 @@ public class JsonQ {
 
         List<Object> temp = new ArrayList<>();
         for (String path : paths) {
+            temp.clear();
             PathHandler func=getPathHandler(jsonPath,path);
             if(results.isEmpty()||func==null){return Collections.emptyList();}
 
-            temp.clear();
             collectionForEach(results,(key,obj)-> func.handle(path,obj,temp));
             results.clear();
             results.addAll(temp);
@@ -596,6 +617,8 @@ public class JsonQ {
         } else if (parts.group(2) != null) {
             collectionForEach(object, (k, v) -> results.add(v));
             sliceList(results, parts.group(2));
+        } else if (parts.group(4) != null) {
+            results.add(valueAtKey(parts.group(6), object));
         }
     }
 
@@ -606,7 +629,7 @@ public class JsonQ {
         String[] slices = sliceNotation.split(",");
 
         for (String slice : slices) {
-            String[] parts = slice.split(":");
+            String[] parts = slice.split(":",-1);
             boolean singleIndex = parts.length == 1 && !parts[0].isEmpty();
             int len= list.size();
             int start = parts.length > 0 && !parts[0].isEmpty() ? Integer.parseInt(parts[0]) : 0;
@@ -708,7 +731,7 @@ public class JsonQ {
     private Object valueAtKey(String key, Object jsonThing) {
         return jsonThing instanceof Map<?, ?> ? ((Map<?, ?>) jsonThing).get(key)
                 : jsonThing instanceof List && PathType.INTEGER.getPattern().matcher(key).matches() ? ((List<?>) jsonThing).get(Integer.parseInt(key))
-                : jsonThing;
+                : null;
     }
 
     public void forEach(Taker<JsonQ> taker) {

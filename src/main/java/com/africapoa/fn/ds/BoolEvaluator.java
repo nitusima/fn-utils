@@ -4,14 +4,37 @@ import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Evaluates boolean expressions provided as strings.
+ * Supports various operators including arithmetic (+, -, *, /, ^),
+ * comparison (>, <, ==, !=, >=, <=), logical (&, |, !, &&, ||),
+ * and string-specific operators (~ for pattern matching).
+ */
 class BoolEvaluator {
 
+    /**
+     * Evaluates the given boolean expression.
+     * <p>
+     * Converts the input string from infix to postfix notation and evaluates it.
+     * Operands can be numbers, strings (enclosed in single quotes), or variables.
+     * </p>
+     *
+     * @param expression the boolean expression to evaluate
+     * @return true if the expression evaluates to true, false otherwise
+     * @throws IllegalArgumentException if the expression contains invalid tokens or unsupported operations
+     */
     public boolean evaluate(String expression) {
         return evaluatePostfix(toPostfix(expression));
     }
 
+    /**
+     * Handles an operator by appending it to the output or pushing it to the stack based on precedence.
+     *
+     * @param output the StringBuilder holding the postfix output
+     * @param operators the stack of operators
+     * @param token the current operator token
+     */
     private void handleOperator(StringBuilder output, Stack<String> operators, String token) {
-        // Only pop if the top is not "(" and has higher or equal precedence.
         while (!operators.isEmpty() &&
                 !operators.peek().equals("(") &&
                 precedence(operators.peek()) >= precedence(token)) {
@@ -20,28 +43,27 @@ class BoolEvaluator {
         operators.push(token);
     }
 
-
-    // Convert infix expression to postfix (Reverse Polish Notation)
+    /**
+     * Converts the given infix expression to postfix notation (Reverse Polish Notation).
+     *
+     * @param infix the infix expression to convert
+     * @return the postfix representation of the expression as a string
+     * @throws IllegalArgumentException if an unexpected token is encountered
+     */
     private String toPostfix(String infix) {
         StringBuilder output = new StringBuilder();
         Stack<String> operators = new Stack<>();
-
-        // Regex to match operands (numbers, single-quoted strings, and variables) and operators/parentheses
         Pattern tokenPattern = Pattern.compile("\\d+\\.?\\d*|'[^']*'|[a-zA-Z]+|[+\\-*/^<>!=&|~]+|[()]");
         Matcher matcher = tokenPattern.matcher(infix);
 
         while (matcher.find()) {
             String token = matcher.group();
-
             if (token.matches("\\d+\\.?\\d*|'[^']*'|[a-zA-Z]+"))
                 output.append(token).append(' ');
-
             else if (token.equals(")") || token.equals("("))
                 handleParenthesis(output, operators, token);
-
             else if (isOperator(token))
                 handleOperator(output, operators, token);
-
             else
                 throw new IllegalArgumentException("Unexpected token: " + token);
         }
@@ -49,10 +71,16 @@ class BoolEvaluator {
         while (!operators.isEmpty()) {
             output.append(operators.pop()).append(' ');
         }
-
         return output.toString();
     }
 
+    /**
+     * Handles parentheses in the infix-to-postfix conversion process.
+     *
+     * @param output the StringBuilder holding the postfix output
+     * @param operators the stack of operators
+     * @param parenthesis the parenthesis token ("(" or ")")
+     */
     private static void handleParenthesis(StringBuilder output, Stack<String> operators, String parenthesis) {
         if (parenthesis.equals("("))
             operators.push(parenthesis);
@@ -66,14 +94,26 @@ class BoolEvaluator {
         }
     }
 
+    /**
+     * Returns the precedence level of the given operator.
+     *
+     * @param operator the operator to check
+     * @return the precedence level (e.g., 1 for +, -, 4 for comparison operators)
+     */
     private static int precedence(String operator) {
         return "+-".contains(operator) ? 1 :
                 "*/".contains(operator) ? 2 :
                         "^".contains(operator) ? 3 :
                                 "<><=>===!=!~".contains(operator) ? 4 : -1;
-
     }
 
+    /**
+     * Evaluates the given postfix expression.
+     *
+     * @param postfix the postfix expression to evaluate
+     * @return true if the expression evaluates to true, false otherwise
+     * @throws IllegalArgumentException if an unexpected token or unsupported operation is encountered
+     */
     private boolean evaluatePostfix(String postfix) {
         Stack<Object> stack = new Stack<>();
         Pattern tokenPattern = Pattern.compile("\\d+\\.?\\d*|'[^']*'|[a-zA-Z]+|[+\\-*/^()<>!=&|~]+");
@@ -97,6 +137,13 @@ class BoolEvaluator {
         return stack.pop().equals(1.0);
     }
 
+    /**
+     * Applies an operator to operands on the stack.
+     *
+     * @param token the operator token
+     * @param stack the stack of operands
+     * @throws IllegalArgumentException if the operator is unsupported or operands are incompatible
+     */
     private void operate(String token, Stack<Object> stack) {
         String error = "Unsupported operand type for operator: %s operand %s and %s";
         Object a = null, b = stack.pop();
@@ -108,7 +155,6 @@ class BoolEvaluator {
             a = stack.pop();
             answer = a instanceof Double && b instanceof Double
                     ? applyOperator(token, (Double) a, (Double) b)
-                    //treating string and double operands differently
                     : isStringOperator(token) ? applyStringOperator(token, String.valueOf(a), String.valueOf(b))
                     : Double.MIN_VALUE;
         }
@@ -118,14 +164,35 @@ class BoolEvaluator {
         stack.push(answer);
     }
 
+    /**
+     * Checks if the given token is an operator.
+     *
+     * @param token the token to check
+     * @return true if the token is an operator, false otherwise
+     */
     private boolean isOperator(String token) {
         return token.matches("[+\\-*/^<>!=&|~]+");
     }
 
+    /**
+     * Checks if the given token is a string-compatible operator.
+     *
+     * @param token the token to check
+     * @return true if the token is a string operator, false otherwise
+     */
     private boolean isStringOperator(String token) {
         return token.matches("[<>=~!]+");
     }
 
+    /**
+     * Applies the given operator to two numeric operands.
+     *
+     * @param op the operator
+     * @param a the first operand
+     * @param b the second operand
+     * @return the result of the operation (1.0 for true, 0.0 for false for comparisons)
+     * @throws IllegalArgumentException if the operator is unsupported
+     */
     private double applyOperator(String op, double a, double b) {
         switch (op) {
             case "+": return a + b;
@@ -144,6 +211,15 @@ class BoolEvaluator {
         }
     }
 
+    /**
+     * Applies the given operator to two string operands.
+     *
+     * @param op the operator
+     * @param a the first operand
+     * @param b the second operand
+     * @return the result of the operation as a double (1.0 for true, 0.0 for false)
+     * @throws IllegalArgumentException if the operator is unsupported for strings
+     */
     private double applyStringOperator(String op, String a, String b) {
         switch (op) {
             case "==": return a.equals(b) ? 1.0 : 0.0;
@@ -156,5 +232,4 @@ class BoolEvaluator {
             default: throw new IllegalArgumentException("Unsupported operator for strings: " + op);
         }
     }
-
 }

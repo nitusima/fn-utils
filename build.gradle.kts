@@ -50,6 +50,14 @@ java {
 kotlin {
     jvmToolchain(17)
 }
+tasks.test {
+    useJUnitPlatform() // Enables JUnit 5
+
+    testLogging {
+        events("passed", "skipped", "failed") // Logs test events
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
 
 publishing {
     publications {
